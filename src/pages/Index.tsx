@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
@@ -22,7 +22,34 @@ import { FileDown, RotateCcw, Receipt, Sparkles } from 'lucide-react';
 const Index = () => {
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
-  const [companies, setCompanies] = useState<Company[]>(defaultCompanies);
+  const [companies, setCompanies] = useState<Company[]>(() => {
+    if (typeof window === 'undefined') return defaultCompanies;
+
+    try {
+      const stored = window.localStorage.getItem('tax-invoice-companies');
+      if (!stored) return defaultCompanies;
+
+      const parsed = JSON.parse(stored) as Company[];
+      // Basic validation: ensure each has gstNo and name
+      if (Array.isArray(parsed) && parsed.every(c => c && typeof c.gstNo === 'string' && typeof c.name === 'string')) {
+        return parsed;
+      }
+
+      return defaultCompanies;
+    } catch {
+      return defaultCompanies;
+    }
+  });
+
+  // Persist companies list so added companies survive page refresh
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('tax-invoice-companies', JSON.stringify(companies));
+    } catch {
+      // Ignore storage errors (e.g., private mode / quota exceeded)
+    }
+  }, [companies]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [invoiceOptions, setInvoiceOptions] = useState<InvoiceOptionsData>({
     paymentTerms: '30days',
